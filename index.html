@@ -358,6 +358,7 @@
       clickToGo:true,
       enableCloseButton:false
     });
+    setTimeout(function(){ google.maps.event.trigger(state.panorama, 'resize'); }, 150);
 
     var panel = document.getElementById('mapPanel');
     var scrim = document.getElementById('scrim');
