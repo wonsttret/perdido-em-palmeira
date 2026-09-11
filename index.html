@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perdido em Palmeira</title>
+<meta name="description" content="Um GeoGuessr só de Palmeira, PR — localizações aleatórias de verdade, com Street View de verdade.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#E9EFE9;
+    --surface:#FFFFFF;
+    --surface-2:#F1F4EE;
+    --text:#17261C;
+    --text-muted:#4B5D50;
+    --pine:#1E3D2B;
+    --pine-soft:#3F6B4E;
+    --terracotta:#C1602E;
+    --terracotta-hover:#A94F24;
+    --terracotta-ink:#FFF6EF;
+    --line:#C9D3C7;
+    --shadow: 0 12px 32px -12px rgba(23,38,28,0.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12201A; --surface:#1A2B22; --surface-2:#20352A; --text:#EFEAE0; --text-muted:#A9B8AC;
+      --pine:#8FC3A2; --pine-soft:#6FA382; --terracotta:#E07B45; --terracotta-hover:#F08F5C;
+      --terracotta-ink:#1A1006; --line:#2E4536; --shadow: 0 12px 32px -12px rgba(0,0,0,0.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12201A; --surface:#1A2B22; --surface-2:#20352A; --text:#EFEAE0; --text-muted:#A9B8AC;
+    --pine:#8FC3A2; --pine-soft:#6FA382; --terracotta:#E07B45; --terracotta-hover:#F08F5C;
+    --terracotta-ink:#1A1006; --line:#2E4536; --shadow: 0 12px 32px -12px rgba(0,0,0,0.55);
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; height:100%; }
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Work Sans', ui-sans-serif, system-ui, sans-serif;
+    min-height:100vh; display:flex; flex-direction:column;
+  }
+  h1,h2,h3,.display{
+    font-family:'Big Shoulders Display','Work Sans',sans-serif;
+    text-transform:uppercase; letter-spacing:0.01em; text-wrap:balance; font-weight:800; line-height:0.95;
+  }
+  button{ font-family:inherit; }
+  button:focus-visible, a:focus-visible{ outline:3px solid var(--terracotta); outline-offset:2px; }
+  .eyebrow{ font-family:'Big Shoulders Display',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; font-size:0.8rem; color:var(--pine-soft); }
+  .num{ font-variant-numeric: tabular-nums; }
+
+  #app{ flex:1; display:flex; flex-direction:column; min-height:100vh; }
+  .topbar{
+    position:sticky; top:0; z-index:40; display:flex; align-items:center; justify-content:space-between;
+    padding:0.7rem 1.1rem; background:var(--surface); border-bottom:1px solid var(--line);
+  }
+  .brand{ display:flex; align-items:center; gap:0.5rem; font-family:'Big Shoulders Display',sans-serif;
+    font-weight:800; font-size:1.15rem; letter-spacing:0.02em; text-transform:uppercase; color:var(--pine); }
+  .brand .pin{ color:var(--terracotta); }
+  .status-pill{ display:flex; align-items:center; gap:0.9rem; font-family:'Big Shoulders Display',sans-serif; font-weight:700; letter-spacing:0.03em; }
+  .status-pill .tag{ background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:0.25rem 0.75rem; font-size:0.95rem; color:var(--text-muted); }
+  .status-pill .score{ color:var(--terracotta); font-size:1.2rem; }
+
+  .landing{ flex:1; display:flex; flex-direction:column; align-items:center; }
+  .hero{
+    position:relative; width:100%; overflow:hidden; min-height:420px; height:56vh; max-height:620px;
+    display:flex; align-items:flex-end;
+    background:
+      radial-gradient(60% 90% at 15% 10%, rgba(143,195,162,0.25), transparent 60%),
+      linear-gradient(160deg, #16281f 0%, #1E3D2B 55%, #2c4d37 100%);
+  }
+  .hero-tex{ position:absolute; inset:0; opacity:0.5; }
+  .hero-content{ position:relative; z-index:2; padding:2.2rem 1.4rem 2rem; width:100%; max-width:760px; margin:0 auto; color:#F3F4EE; }
+  .hero .eyebrow{ color:#CFE3D4; }
+  .hero h1{ font-size:clamp(2.6rem,8vw,4.6rem); margin:0.2rem 0 0.6rem; color:#FBFAF4; }
+  .hero p.lede{ font-size:1.05rem; max-width:46ch; color:#E4E9E0; margin:0 0 1.4rem; }
+  .hero-meta{ display:flex; flex-wrap:wrap; gap:0.5rem 1.2rem; font-size:0.85rem; color:#CBD6C9; margin-bottom:1.4rem; }
+  .hero-meta b{ color:#FBFAF4; }
+
+  .btn{
+    appearance:none; border:none; cursor:pointer; font-family:'Big Shoulders Display',sans-serif; font-weight:700;
+    letter-spacing:0.03em; text-transform:uppercase; font-size:1.05rem; padding:0.85rem 1.7rem; border-radius:10px;
+    background:var(--terracotta); color:var(--terracotta-ink); box-shadow:var(--shadow); transition:transform .15s ease, background .15s ease;
+  }
+  .btn:hover{ background:var(--terracotta-hover); transform:translateY(-1px); }
+  .btn:active{ transform:translateY(0); }
+  .btn.secondary{ background:transparent; color:inherit; box-shadow:none; border:2px solid var(--line); }
+  .btn.secondary:hover{ border-color:var(--terracotta); background:transparent; color:var(--terracotta); }
+  .btn:disabled{ opacity:0.45; cursor:not-allowed; transform:none; }
+  .btn.small{ padding:0.5rem 1.1rem; font-size:0.82rem; border-radius:8px; }
+
+  .landing-body{ width:100%; max-width:760px; padding:2rem 1.4rem 3rem; margin:0 auto; display:flex; flex-direction:column; gap:1.6rem; }
+  .rules{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.9rem; }
+  .rule-card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:0.95rem 1rem; }
+  .rule-card .k{ font-family:'Big Shoulders Display'; font-weight:800; font-size:1.6rem; color:var(--pine); }
+  .rule-card .v{ font-size:0.85rem; color:var(--text-muted); }
+  .already-played{ background:var(--surface-2); border:1px dashed var(--line); border-radius:12px; padding:0.9rem 1.1rem; font-size:0.92rem; color:var(--text-muted); }
+  .already-played b{ color:var(--text); }
+  .setup-warning{ background:#3a1f14; color:#ffd9c2; border:1px solid #7a3d20; border-radius:12px; padding:1rem 1.1rem; font-size:0.9rem; }
+  .setup-warning a{ color:#ffb27a; }
+
+  .stage{ flex:1; display:flex; flex-direction:column; position:relative; }
+  .pano-wrap{ position:relative; flex:1; min-height:340px; background:#0c1410; }
+  .pano-wrap .gmap-el{ position:absolute; inset:0; }
+  .pano-loading{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:0.6rem; color:#E7ECE4; background:#0c1410; z-index:5;
+  }
+  .spinner{ width:34px; height:34px; border-radius:50%; border:3px solid rgba(255,255,255,0.25); border-top-color:var(--terracotta); animation:spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .map-scrim{ position:fixed; inset:0; background:rgba(10,16,12,0.5); z-index:45; opacity:0; pointer-events:none; transition:opacity .25s ease; }
+  .map-scrim.show{ opacity:1; pointer-events:auto; }
+
+  .map-panel{ position:fixed; z-index:50; right:16px; bottom:16px; width:150px; display:flex; flex-direction:column;
+    transition:right .28s cubic-bezier(.2,.8,.2,1), bottom .28s cubic-bezier(.2,.8,.2,1), transform .28s cubic-bezier(.2,.8,.2,1); }
+  .map-chip-btn{
+    width:100%; aspect-ratio:1/1; border-radius:14px; border:2px solid rgba(243,244,238,0.85); box-shadow:var(--shadow);
+    background:var(--pine); color:#F3F4EE; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.3rem;
+    font-family:'Work Sans'; font-size:0.72rem; text-align:center; padding:0.5rem;
+  }
+  .map-chip-btn .ico{ font-size:1.6rem; }
+  .map-panel.expanded{ right:50%; bottom:50%; transform:translate(50%,50%); width:min(90vw,560px); }
+  .map-panel.expanded .map-chip-btn{ display:none; }
+  .map-viewport{ position:relative; width:100%; aspect-ratio:1/1; border-radius:14px; overflow:hidden; border:2px solid rgba(243,244,238,0.85); box-shadow:var(--shadow); background:var(--surface-2); display:none; }
+  .map-panel.expanded .map-viewport{ display:block; }
+  .map-controls{ display:none; justify-content:center; gap:0.6rem; margin-top:0.6rem; }
+  .map-panel.expanded .map-controls{ display:flex; }
+
+  .roundbar{ display:flex; align-items:center; justify-content:space-between; padding:0.6rem 1.1rem; background:var(--surface); border-top:1px solid var(--line); font-size:0.85rem; color:var(--text-muted); }
+  .roundbar b{ color:var(--text); }
+
+  .reveal{ flex:1; display:flex; flex-direction:column; align-items:center; padding:1.6rem 1.2rem 2.2rem; gap:1.2rem; max-width:640px; margin:0 auto; width:100%; }
+  .reveal-map{ position:relative; width:100%; max-width:440px; aspect-ratio:1/1; border-radius:16px; overflow:hidden; border:1px solid var(--line); box-shadow:var(--shadow); }
+  .reveal-score{ text-align:center; }
+  .reveal-score .pts{ font-size:clamp(2.4rem,10vw,3.6rem); color:var(--terracotta); }
+  .reveal-score .dist{ color:var(--text-muted); font-size:0.95rem; }
+
+  .final{ flex:1; display:flex; flex-direction:column; align-items:center; padding:2.2rem 1.2rem 3rem; gap:1.6rem; max-width:640px; margin:0 auto; width:100%; }
+  .final-total{ text-align:center; }
+  .final-total .pts{ font-size:clamp(3rem,14vw,5rem); color:var(--terracotta); }
+  .breakdown{ width:100%; display:flex; flex-direction:column; border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+  .breakdown-row{ display:flex; align-items:center; gap:0.8rem; padding:0.75rem 0.9rem; background:var(--surface); border-bottom:1px solid var(--line); }
+  .breakdown-row:last-child{ border-bottom:none; }
+  .breakdown-row .n{ font-size:0.92rem; font-weight:600; }
+  .breakdown-row .d{ font-size:0.78rem; color:var(--text-muted); }
+  .breakdown-row .info{ flex:1; min-width:0; }
+  .breakdown-row .pts{ font-family:'Big Shoulders Display'; font-weight:800; font-size:1.15rem; color:var(--pine-soft); flex:none; }
+  .final-actions{ display:flex; gap:0.7rem; flex-wrap:wrap; justify-content:center; }
+  .share-box{ width:100%; font-size:0.8rem; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:0.7rem 0.8rem; white-space:pre-wrap; color:var(--text-muted); display:none; }
+  .share-box.show{ display:block; }
+  footer.credit-line{ text-align:center; font-size:0.72rem; color:var(--text-muted); padding:1rem; }
+
+  @media (max-width:560px){
+    .hero{ height:64vh; min-height:380px; }
+    .map-panel{ width:116px; right:12px; bottom:12px; }
+    .map-panel.expanded{ width:94vw; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="config.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- área de sorteio (bounding box de Palmeira, PR) ---------- */
+  var BOUNDS = { latMin:-25.450, latMax:-25.395, lonMin:-50.020, lonMax:-49.965 };
+  var CENTER = { lat:-25.4212, lng:-49.9981 };
+  var ROUNDS_PER_GAME = 5;
+  var SEARCH_RADIUS_M = 1800;
+  var MIN_SEPARATION_KM = 0.25;
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  function haversineKm(lat1,lon1,lat2,lon2){
+    var R=6371, toRad=function(d){return d*Math.PI/180;};
+    var dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+    var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+  function scoreFromKm(d){
+    if(d < 0.02) return 5000;
+    return Math.max(0, Math.min(5000, Math.round(5000*Math.exp(-d/0.8))));
+  }
+  function fmtDist(km){
+    if(km < 1) return Math.round(km*1000) + ' m';
+    return km.toFixed(2).replace('.', ',') + ' km';
+  }
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function seededRng(seed){
+    var h = 1779033703 ^ seed.length;
+    for(var i=0;i<seed.length;i++){ h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h<<13)|(h>>>19); }
+    return function(){
+      h = Math.imul(h ^ (h>>>16), 2246822507);
+      h = Math.imul(h ^ (h>>>13), 3266489909);
+      h ^= h>>>16;
+      return (h>>>0) / 4294967296;
+    };
+  }
+  function loadResult(){
+    try{ var raw = localStorage.getItem('perdidoEmPalmeira_'+todayStr()); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  }
+  function saveResult(data){
+    try{ localStorage.setItem('perdidoEmPalmeira_'+todayStr(), JSON.stringify(data)); }catch(e){}
+  }
+  function tierEmoji(score){
+    if(score >= 4000) return '🟩';
+    if(score >= 2000) return '🟨';
+    if(score >= 500) return '🟧';
+    return '🟥';
+  }
+
+  var app = document.getElementById('app');
+  var state = { rounds:[], current:0, guess:null, results:[], panorama:null, guessMap:null, guessMarker:null, mapExpanded:false };
+
+  function heroTexture(){
+    return '<svg class="hero-tex" width="100%" height="100%" preserveAspectRatio="none">' +
+      '<defs><pattern id="mosaic" width="46" height="46" patternUnits="userSpaceOnUse">' +
+      '<path d="M0 23 Q 11.5 0 23 23 Q 34.5 46 46 23" fill="none" stroke="rgba(243,244,238,0.10)" stroke-width="2"/>' +
+      '</pattern></defs><rect width="100%" height="100%" fill="url(#mosaic)"/></svg>';
+  }
+
+  function renderTopbar(showStatus){
+    var totalScore = state.results.reduce(function(s,r){return s+r.score;},0);
+    return '<div class="topbar"><div class="brand"><span class="pin">◆</span> Perdido em Palmeira</div>' +
+      (showStatus ? ('<div class="status-pill"><span class="tag">Rodada <b class="num">'+(state.current+1)+'</b>/'+ROUNDS_PER_GAME+'</span><span class="score num">'+totalScore+' pts</span></div>') : '') +
+      '</div>';
+  }
+
+  function keyMissing(){
+    return !window.GOOGLE_MAPS_API_KEY || window.GOOGLE_MAPS_API_KEY.indexOf('COLE_SUA_CHAVE') === 0;
+  }
+
+  function renderLanding(){
+    var prev = loadResult();
+    app.innerHTML =
+      renderTopbar(false) +
+      '<div class="landing">' +
+        '<div class="hero">' + heroTexture() +
+          '<div class="hero-content">' +
+            '<div class="eyebrow">Desafio diário &middot; ' + new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}) + '</div>' +
+            '<h1>Perdido em<br>Palmeira</h1>' +
+            '<p class="lede">Um GeoGuessr só da sua cidade: o jogo te larga em um ponto aleatório de verdade em Palmeira, PR, com Street View de verdade &mdash; anda, gira, dá zoom. Você sabe onde está?</p>' +
+            '<div class="hero-meta"><span><b>5</b> rodadas</span><span><b>865m</b> de altitude</span><span><b>25.000</b> pts no total</span></div>' +
+            '<button class="btn" id="btnPlay">Jogar</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="landing-body">' +
+          (keyMissing() ? '<div class="setup-warning">A chave do Google Maps ainda não foi configurada em <code>config.js</code>. Veja o README.md deste repositório para o passo a passo.</div>' : '') +
+          (prev ? ('<div class="already-played">Você já jogou o desafio de hoje &mdash; pontuação <b>'+prev.total+'/25000</b>. Pode jogar de novo, mas só vale como treino.</div>') : '') +
+          '<div class="rules">' +
+            '<div class="rule-card"><div class="k">01</div><div class="v">Ande e olhe ao redor no Street View de verdade.</div></div>' +
+            '<div class="rule-card"><div class="k">02</div><div class="v">Abra o mapa e clique no ponto onde acha que está.</div></div>' +
+            '<div class="rule-card"><div class="k">03</div><div class="v">Confirme o palpite e veja a distância até o local real.</div></div>' +
+            '<div class="rule-card"><div class="k">04</div><div class="v">Quanto mais perto, mais pontos &mdash; até 5.000 por rodada.</div></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<footer class="credit-line">Street View e mapas &copy; Google</footer>';
+    document.getElementById('btnPlay').addEventListener('click', function(){
+      if(keyMissing()) return;
+      state.current = 0; state.results = []; state.guess = null;
+      startGame();
+    });
+  }
+
+  /* ---------- sorteio de rodadas ---------- */
+  function randomPoint(rng){
+    return { lat: BOUNDS.latMin + rng()*(BOUNDS.latMax-BOUNDS.latMin), lng: BOUNDS.lonMin + rng()*(BOUNDS.lonMax-BOUNDS.lonMin) };
+  }
+  function lookupPanorama(svc, loc){
+    return new Promise(function(resolve){
+      svc.getPanorama({ location:loc, radius:SEARCH_RADIUS_M, source: google.maps.StreetViewSource.OUTDOOR }, function(data, status){
+        if(status === google.maps.StreetViewStatus.OK){
+          resolve({ ok:true, lat:data.location.latLng.lat(), lng:data.location.latLng.lng(), pano:data.location.pano });
+        } else { resolve({ ok:false }); }
+      });
+    });
+  }
+  async function pickRounds(){
+    var rng = seededRng(todayStr());
+    var svc = new google.maps.StreetViewService();
+    var picks = [];
+    var guard = 0;
+    while(picks.length < ROUNDS_PER_GAME && guard < 250){
+      guard++;
+      var res = await lookupPanorama(svc, randomPoint(rng));
+      if(!res.ok) continue;
+      var tooClose = picks.some(function(p){ return haversineKm(p.lat,p.lng,res.lat,res.lng) < MIN_SEPARATION_KM; });
+      if(tooClose) continue;
+      picks.push(res);
+    }
+    while(picks.length < ROUNDS_PER_GAME){ picks.push({ lat:CENTER.lat, lng:CENTER.lng, pano:null }); }
+    return picks;
+  }
+
+  function startGame(){
+    app.innerHTML = renderTopbar(false) +
+      '<div class="pano-loading" style="position:relative; height:70vh;"><div class="spinner"></div><div>Sorteando 5 pontos aleatórios em Palmeira&hellip;</div></div>';
+    pickRounds().then(function(rounds){
+      state.rounds = rounds;
+      state.current = 0;
+      renderRound();
+    });
+  }
+
+  function currentRound(){ return state.rounds[state.current]; }
+
+  function renderRound(){
+    state.guess = null;
+    state.guessMarker = null;
+    var r = currentRound();
+    app.innerHTML =
+      renderTopbar(true) +
+      '<div class="stage">' +
+        '<div class="pano-wrap"><div class="gmap-el" id="panoEl"></div></div>' +
+        '<div class="roundbar"><span>Onde em Palmeira fica isso?</span><span>Rodada <b class="num">'+(state.current+1)+'</b> de '+ROUNDS_PER_GAME+'</span></div>' +
+      '</div>' +
+      '<div class="map-scrim" id="scrim"></div>' +
+      '<div class="map-panel" id="mapPanel">' +
+        '<button class="map-chip-btn" id="mapChipBtn"><span class="ico">📍</span>clique para marcar seu palpite</button>' +
+        '<div class="map-viewport" id="mapViewport"></div>' +
+        '<div class="map-controls">' +
+          '<button class="btn secondary small" id="btnCancelGuess">Fechar</button>' +
+          '<button class="btn small" id="btnConfirm" disabled>Confirmar palpite</button>' +
+        '</div>' +
+      '</div>';
+
+    state.panorama = new google.maps.StreetViewPanorama(document.getElementById('panoEl'), {
+      position: { lat:r.lat, lng:r.lng },
+      pov: { heading: Math.random()*360, pitch:0 },
+      zoom: 0,
+      addressControl:false,
+      showRoadLabels:false,
+      linksControl:true,
+      panControl:true,
+      zoomControl:true,
+      fullscreenControl:false,
+      motionTracking:false,
+      motionTrackingControl:false,
+      clickToGo:true,
+      enableCloseButton:false
+    });
+
+    var panel = document.getElementById('mapPanel');
+    var scrim = document.getElementById('scrim');
+    var viewport = document.getElementById('mapViewport');
+    var confirmBtn = document.getElementById('btnConfirm');
+
+    function ensureGuessMap(){
+      if(state.guessMap) return;
+      state.guessMap = new google.maps.Map(viewport, {
+        center: CENTER, zoom: 13,
+        streetViewControl:false, fullscreenControl:false, mapTypeControl:true, clickableIcons:false
+      });
+      state.guessMap.addListener('click', function(e){
+        placeGuessMarker(e.latLng);
+      });
+    }
+    function placeGuessMarker(latLng){
+      if(state.guessMarker){ state.guessMarker.setPosition(latLng); }
+      else {
+        state.guessMarker = new google.maps.Marker({ position:latLng, map:state.guessMap, draggable:true });
+        state.guessMarker.addListener('dragend', function(){ state.guess = { lat:state.guessMarker.getPosition().lat(), lng:state.guessMarker.getPosition().lng() }; confirmBtn.disabled = false; });
+      }
+      state.guess = { lat:latLng.lat(), lng:latLng.lng() };
+      confirmBtn.disabled = false;
+    }
+
+    function expand(){
+      panel.classList.add('expanded'); scrim.classList.add('show'); state.mapExpanded = true;
+      ensureGuessMap();
+      setTimeout(function(){
+        google.maps.event.trigger(state.guessMap, 'resize');
+        if(!state.guess) state.guessMap.setCenter(CENTER);
+      }, 60);
+    }
+    function collapse(){
+      panel.classList.remove('expanded'); scrim.classList.remove('show'); state.mapExpanded = false;
+    }
+    document.getElementById('mapChipBtn').addEventListener('click', expand);
+    document.getElementById('btnCancelGuess').addEventListener('click', function(ev){ ev.stopPropagation(); collapse(); });
+    scrim.addEventListener('click', collapse);
+    confirmBtn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      if(!state.guess) return;
+      collapse();
+      settleRound();
+    });
+  }
+
+  function settleRound(){
+    var r = currentRound();
+    var dKm = haversineKm(state.guess.lat, state.guess.lng, r.lat, r.lng);
+    var score = scoreFromKm(dKm);
+    state.results.push({ distKm:dKm, score:score, guess:state.guess, truth:{lat:r.lat,lng:r.lng} });
+    renderReveal(dKm, score);
+  }
+
+  function renderReveal(dKm, score){
+    var isLast = state.current === state.rounds.length - 1;
+    app.innerHTML =
+      renderTopbar(true) +
+      '<div class="reveal">' +
+        '<div class="eyebrow">Resultado da rodada '+(state.current+1)+'</div>' +
+        '<div class="reveal-map" id="revealMap"></div>' +
+        '<div class="reveal-score"><div class="pts display num">'+score+' pts</div><div class="dist">Você errou por <b>'+fmtDist(dKm)+'</b></div></div>' +
+        '<button class="btn" id="btnNext">'+(isLast ? 'Ver resultado final' : 'Próxima rodada')+'</button>' +
+      '</div>';
+
+    var res = state.results[state.results.length-1];
+    var map = new google.maps.Map(document.getElementById('revealMap'), {
+      center: res.truth, zoom: 13, streetViewControl:false, fullscreenControl:false, mapTypeControl:false, disableDefaultUI:true
+    });
+    var truthMarker = new google.maps.Marker({ position:res.truth, map:map, icon:{ path: google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#3F6B4E', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 } });
+    var guessMarker = new google.maps.Marker({ position:res.guess, map:map, icon:{ path: google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#C1602E', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 } });
+    new google.maps.Polyline({ path:[res.guess, res.truth], strokeColor:'#17261C', strokeOpacity:0.9, strokeWeight:4, icons:[{ icon:{path:'M 0,-1 0,1', strokeOpacity:1, scale:3}, offset:'0', repeat:'14px' }], map:map });
+    var bounds = new google.maps.LatLngBounds();
+    bounds.extend(res.truth); bounds.extend(res.guess);
+    map.fitBounds(bounds, 60);
+
+    document.getElementById('btnNext').addEventListener('click', function(){
+      if(isLast){ renderFinal(); } else { state.current++; renderRound(); }
+    });
+  }
+
+  function renderFinal(){
+    var total = state.results.reduce(function(s,r){return s+r.score;},0);
+    saveResult({ total: total, date: todayStr() });
+
+    var rowsHtml = state.results.map(function(res,i){
+      return '<div class="breakdown-row"><div class="info"><div class="n">Rodada '+(i+1)+'</div><div class="d">'+fmtDist(res.distKm)+'</div></div><div class="pts num">'+res.score+'</div></div>';
+    }).join('');
+
+    var shareLines = ['Perdido em Palmeira 🌲📍 '+new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})];
+    state.results.forEach(function(res,i){ shareLines.push('Rodada '+(i+1)+': '+tierEmoji(res.score)+' '+res.score); });
+    shareLines.push('Total: '+total+'/25000');
+    var shareText = shareLines.join('\n');
+
+    app.innerHTML =
+      renderTopbar(false) +
+      '<div class="final">' +
+        '<div class="eyebrow">Desafio concluído</div>' +
+        '<div class="final-total"><div class="pts display num">'+total+'</div><div class="dist" style="color:var(--text-muted)">de 25.000 pontos possíveis</div></div>' +
+        '<div class="breakdown">'+rowsHtml+'</div>' +
+        '<div class="final-actions">' +
+          '<button class="btn" id="btnShare">Compartilhar resultado</button>' +
+          '<button class="btn secondary" id="btnAgain">Jogar novamente</button>' +
+        '</div>' +
+        '<div class="share-box" id="shareBox"></div>' +
+      '</div>' +
+      '<footer class="credit-line">Street View e mapas &copy; Google</footer>';
+
+    document.getElementById('btnAgain').addEventListener('click', function(){
+      state.current = 0; state.results = []; state.guess = null;
+      startGame();
+    });
+    document.getElementById('btnShare').addEventListener('click', function(){
+      var box = document.getElementById('shareBox');
+      box.textContent = shareText; box.classList.add('show');
+      try{
+        navigator.clipboard.writeText(shareText);
+        this.textContent = 'Copiado!';
+        var btn=this; setTimeout(function(){ btn.textContent='Compartilhar resultado'; }, 1800);
+      }catch(e){}
+    });
+  }
+
+  window.__initPerdidoEmPalmeira = function(){ renderLanding(); };
+
+  if(keyMissing()){
+    window.__initPerdidoEmPalmeira();
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(window.GOOGLE_MAPS_API_KEY) + '&callback=__initPerdidoEmPalmeira';
+    s.async = true; s.defer = true;
+    document.head.appendChild(s);
+  }
+})();
+</script>
+</body>
+</html>
