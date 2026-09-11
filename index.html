@@ -169,11 +169,13 @@
   "use strict";
 
   /* ---------- área de sorteio (bounding box de Palmeira, PR) ---------- */
-  var BOUNDS = { latMin:-25.450, latMax:-25.395, lonMin:-50.020, lonMax:-49.965 };
+  var BOUNDS = { latMin:-25.460, latMax:-25.385, lonMin:-50.035, lonMax:-49.955 };
   var CENTER = { lat:-25.4212, lng:-49.9981 };
   var ROUNDS_PER_GAME = 5;
   var SEARCH_RADIUS_M = 1800;
   var MIN_SEPARATION_KM = 0.25;
+  var SESSION_KEY = 'ppalmeira_session_v2';
+  var LAST_RESULT_KEY = 'ppalmeira_last_result';
 
   function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
@@ -191,25 +193,31 @@
     if(km < 1) return Math.round(km*1000) + ' m';
     return km.toFixed(2).replace('.', ',') + ' km';
   }
-  function todayStr(){
-    var d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+  /* ---------- persistência: retomar jogo em andamento após F5 / fechar aba ---------- */
+  function saveSession(){
+    try{
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ rounds: state.rounds, current: state.current, results: state.results }));
+    }catch(e){}
   }
-  function seededRng(seed){
-    var h = 1779033703 ^ seed.length;
-    for(var i=0;i<seed.length;i++){ h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h<<13)|(h>>>19); }
-    return function(){
-      h = Math.imul(h ^ (h>>>16), 2246822507);
-      h = Math.imul(h ^ (h>>>13), 3266489909);
-      h ^= h>>>16;
-      return (h>>>0) / 4294967296;
-    };
+  function clearSession(){
+    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
   }
-  function loadResult(){
-    try{ var raw = localStorage.getItem('perdidoEmPalmeira_'+todayStr()); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  function loadSession(){
+    try{
+      var raw = localStorage.getItem(SESSION_KEY);
+      if(!raw) return null;
+      var data = JSON.parse(raw);
+      if(!data || !Array.isArray(data.rounds) || data.rounds.length !== ROUNDS_PER_GAME) return null;
+      if(typeof data.current !== 'number' || data.current >= ROUNDS_PER_GAME) return null;
+      return data;
+    }catch(e){ return null; }
   }
-  function saveResult(data){
-    try{ localStorage.setItem('perdidoEmPalmeira_'+todayStr(), JSON.stringify(data)); }catch(e){}
+  function loadLastResult(){
+    try{ var raw = localStorage.getItem(LAST_RESULT_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  }
+  function saveLastResult(total){
+    try{ localStorage.setItem(LAST_RESULT_KEY, JSON.stringify({ total: total })); }catch(e){}
   }
   function tierEmoji(score){
     if(score >= 4000) return '🟩';
@@ -240,13 +248,13 @@
   }
 
   function renderLanding(){
-    var prev = loadResult();
+    var prev = loadLastResult();
     app.innerHTML =
       renderTopbar(false) +
       '<div class="landing">' +
         '<div class="hero">' + heroTexture() +
           '<div class="hero-content">' +
-            '<div class="eyebrow">Desafio diário &middot; ' + new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long'}) + '</div>' +
+            '<div class="eyebrow">Desafio da cidade</div>' +
             '<h1>Perdido em<br>Palmeira</h1>' +
             '<p class="lede">Um GeoGuessr só da sua cidade: o jogo te larga em um ponto aleatório de verdade em Palmeira, PR, com Street View de verdade &mdash; anda, gira, dá zoom. Você sabe onde está?</p>' +
             '<div class="hero-meta"><span><b>5</b> rodadas</span><span><b>865m</b> de altitude</span><span><b>25.000</b> pts no total</span></div>' +
@@ -255,7 +263,7 @@
         '</div>' +
         '<div class="landing-body">' +
           (keyMissing() ? '<div class="setup-warning">A chave do Google Maps ainda não foi configurada em <code>config.js</code>. Veja o README.md deste repositório para o passo a passo.</div>' : '') +
-          (prev ? ('<div class="already-played">Você já jogou o desafio de hoje &mdash; pontuação <b>'+prev.total+'/25000</b>. Pode jogar de novo, mas só vale como treino.</div>') : '') +
+          (prev ? ('<div class="already-played">Seu último resultado: <b>'+prev.total+'/25000</b>.</div>') : '') +
           '<div class="rules">' +
             '<div class="rule-card"><div class="k">01</div><div class="v">Ande e olhe ao redor no Street View de verdade.</div></div>' +
             '<div class="rule-card"><div class="k">02</div><div class="v">Abra o mapa e clique no ponto onde acha que está.</div></div>' +
@@ -267,14 +275,15 @@
       '<footer class="credit-line">Street View e mapas &copy; Google</footer>';
     document.getElementById('btnPlay').addEventListener('click', function(){
       if(keyMissing()) return;
+      clearSession();
       state.current = 0; state.results = []; state.guess = null;
       startGame();
     });
   }
 
-  /* ---------- sorteio de rodadas ---------- */
-  function randomPoint(rng){
-    return { lat: BOUNDS.latMin + rng()*(BOUNDS.latMax-BOUNDS.latMin), lng: BOUNDS.lonMin + rng()*(BOUNDS.lonMax-BOUNDS.lonMin) };
+  /* ---------- sorteio de rodadas (aleatoriedade real, a cada partida) ---------- */
+  function randomPoint(){
+    return { lat: BOUNDS.latMin + Math.random()*(BOUNDS.latMax-BOUNDS.latMin), lng: BOUNDS.lonMin + Math.random()*(BOUNDS.lonMax-BOUNDS.lonMin) };
   }
   function lookupPanorama(svc, loc){
     return new Promise(function(resolve){
@@ -286,13 +295,12 @@
     });
   }
   async function pickRounds(){
-    var rng = seededRng(todayStr());
     var svc = new google.maps.StreetViewService();
     var picks = [];
     var guard = 0;
     while(picks.length < ROUNDS_PER_GAME && guard < 250){
       guard++;
-      var res = await lookupPanorama(svc, randomPoint(rng));
+      var res = await lookupPanorama(svc, randomPoint());
       if(!res.ok) continue;
       var tooClose = picks.some(function(p){ return haversineKm(p.lat,p.lng,res.lat,res.lng) < MIN_SEPARATION_KM; });
       if(tooClose) continue;
@@ -308,6 +316,7 @@
     pickRounds().then(function(rounds){
       state.rounds = rounds;
       state.current = 0;
+      saveSession();
       renderRound();
     });
   }
@@ -317,6 +326,9 @@
   function renderRound(){
     state.guess = null;
     state.guessMarker = null;
+    state.guessMap = null;
+    state.mapExpanded = false;
+    saveSession();
     var r = currentRound();
     app.innerHTML =
       renderTopbar(true) +
@@ -402,6 +414,7 @@
     var dKm = haversineKm(state.guess.lat, state.guess.lng, r.lat, r.lng);
     var score = scoreFromKm(dKm);
     state.results.push({ distKm:dKm, score:score, guess:state.guess, truth:{lat:r.lat,lng:r.lng} });
+    saveSession();
     renderReveal(dKm, score);
   }
 
@@ -434,7 +447,8 @@
 
   function renderFinal(){
     var total = state.results.reduce(function(s,r){return s+r.score;},0);
-    saveResult({ total: total, date: todayStr() });
+    saveLastResult(total);
+    clearSession();
 
     var rowsHtml = state.results.map(function(res,i){
       return '<div class="breakdown-row"><div class="info"><div class="n">Rodada '+(i+1)+'</div><div class="d">'+fmtDist(res.distKm)+'</div></div><div class="pts num">'+res.score+'</div></div>';
@@ -474,7 +488,17 @@
     });
   }
 
-  window.__initPerdidoEmPalmeira = function(){ renderLanding(); };
+  window.__initPerdidoEmPalmeira = function(){
+    var session = loadSession();
+    if(session){
+      state.rounds = session.rounds;
+      state.current = session.current;
+      state.results = session.results;
+      renderRound();
+    } else {
+      renderLanding();
+    }
+  };
 
   if(keyMissing()){
     window.__initPerdidoEmPalmeira();
