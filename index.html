@@ -226,6 +226,7 @@
 
   var app = document.getElementById('app');
   var state = { rounds:[], current:0, guess:null, results:[], panorama:null, guessMap:null, guessMarker:null, mapExpanded:false };
+  window.__DBG = state;
 
   function heroTexture(){
     return '<svg class="hero-tex" width="100%" height="100%" preserveAspectRatio="none">' +
