@@ -225,8 +225,8 @@
   }
 
   var app = document.getElementById('app');
-  var state = { rounds:[], current:0, guess:null, results:[], panorama:null, guessMap:null, guessMarker:null, mapExpanded:false };
-  window.__DBG = state;
+  var state = { rounds:[], current:0, guess:null, results:[], panorama:null, guessMap:null, guessMarker:null, mapExpanded:false,
+    revealMap:null, revealTruthMarker:null, revealGuessMarker:null, revealPolyline:null };
 
   function heroTexture(){
     return '<svg class="hero-tex" width="100%" height="100%" preserveAspectRatio="none">' +
@@ -321,18 +321,15 @@
 
   function currentRound(){ return state.rounds[state.current]; }
 
-  function renderRound(){
-    state.guess = null;
-    state.guessMarker = null;
-    state.guessMap = null;
-    state.mapExpanded = false;
-    saveSession();
-    var r = currentRound();
+  /* A cena (stage) é montada uma única vez por partida e reaproveitada entre
+     rodadas — recriar StreetViewPanorama/Map a cada rodada esgota os
+     contextos WebGL do navegador e a imagem para de aparecer depois da 2ª rodada. */
+  function buildGameShell(){
     app.innerHTML =
-      renderTopbar(true) +
-      '<div class="stage">' +
+      '<div id="topbarSlot"></div>' +
+      '<div class="stage" id="playView">' +
         '<div class="pano-wrap"><div class="gmap-el" id="panoEl"></div></div>' +
-        '<div class="roundbar"><span>Onde em Palmeira fica isso?</span><span>Rodada <b class="num">'+(state.current+1)+'</b> de '+ROUNDS_PER_GAME+'</span></div>' +
+        '<div class="roundbar"><span>Onde em Palmeira fica isso?</span><span id="roundbarText"></span></div>' +
       '</div>' +
       '<div class="map-scrim" id="scrim"></div>' +
       '<div class="map-panel" id="mapPanel">' +
@@ -342,70 +339,114 @@
           '<button class="btn secondary small" id="btnCancelGuess">Fechar</button>' +
           '<button class="btn small" id="btnConfirm" disabled>Confirmar palpite</button>' +
         '</div>' +
+      '</div>' +
+      '<div class="reveal" id="revealView" hidden>' +
+        '<div class="eyebrow" id="revealEyebrow"></div>' +
+        '<div class="reveal-map" id="revealMap"></div>' +
+        '<div class="reveal-score"><div class="pts display num" id="revealPts"></div><div class="dist" id="revealDist"></div></div>' +
+        '<button class="btn" id="btnNext"></button>' +
       '</div>';
+    wireGameEvents();
+  }
 
-    state.panorama = new google.maps.StreetViewPanorama(document.getElementById('panoEl'), {
-      position: { lat:r.lat, lng:r.lng },
-      pov: { heading: Math.random()*360, pitch:0 },
-      zoom: 0,
-      addressControl:false,
-      showRoadLabels:false,
-      linksControl:true,
-      panControl:true,
-      zoomControl:true,
-      fullscreenControl:false,
-      motionTracking:false,
-      motionTrackingControl:false,
-      clickToGo:true,
-      enableCloseButton:false
-    });
-    setTimeout(function(){ google.maps.event.trigger(state.panorama, 'resize'); }, 150);
-
-    var panel = document.getElementById('mapPanel');
-    var scrim = document.getElementById('scrim');
-    var viewport = document.getElementById('mapViewport');
+  function wireGameEvents(){
     var confirmBtn = document.getElementById('btnConfirm');
-
-    function ensureGuessMap(){
-      if(state.guessMap) return;
-      state.guessMap = new google.maps.Map(viewport, {
-        center: CENTER, zoom: 13,
-        streetViewControl:false, fullscreenControl:false, mapTypeControl:true, clickableIcons:false
-      });
-      state.guessMap.addListener('click', function(e){
-        placeGuessMarker(e.latLng);
-      });
-    }
-    function placeGuessMarker(latLng){
-      if(state.guessMarker){ state.guessMarker.setPosition(latLng); }
-      else {
-        state.guessMarker = new google.maps.Marker({ position:latLng, map:state.guessMap, draggable:true });
-        state.guessMarker.addListener('dragend', function(){ state.guess = { lat:state.guessMarker.getPosition().lat(), lng:state.guessMarker.getPosition().lng() }; confirmBtn.disabled = false; });
-      }
-      state.guess = { lat:latLng.lat(), lng:latLng.lng() };
-      confirmBtn.disabled = false;
-    }
-
-    function expand(){
-      panel.classList.add('expanded'); scrim.classList.add('show'); state.mapExpanded = true;
-      ensureGuessMap();
-      setTimeout(function(){
-        google.maps.event.trigger(state.guessMap, 'resize');
-        if(!state.guess) state.guessMap.setCenter(CENTER);
-      }, 60);
-    }
-    function collapse(){
-      panel.classList.remove('expanded'); scrim.classList.remove('show'); state.mapExpanded = false;
-    }
-    document.getElementById('mapChipBtn').addEventListener('click', expand);
-    document.getElementById('btnCancelGuess').addEventListener('click', function(ev){ ev.stopPropagation(); collapse(); });
-    scrim.addEventListener('click', collapse);
+    document.getElementById('mapChipBtn').addEventListener('click', expandMapPanel);
+    document.getElementById('btnCancelGuess').addEventListener('click', function(ev){ ev.stopPropagation(); collapseMapPanel(); });
+    document.getElementById('scrim').addEventListener('click', collapseMapPanel);
     confirmBtn.addEventListener('click', function(ev){
       ev.stopPropagation();
       if(!state.guess) return;
-      collapse();
+      collapseMapPanel();
       settleRound();
     });
+    document.getElementById('btnNext').addEventListener('click', function(){
+      if(state.current === state.rounds.length-1){ renderFinal(); } else { state.current++; renderRound(); }
+    });
+  }
+
+  function ensurePanorama(r){
+    if(!state.panorama){
+      state.panorama = new google.maps.StreetViewPanorama(document.getElementById('panoEl'), {
+        position: { lat:r.lat, lng:r.lng },
+        pov: { heading: Math.random()*360, pitch:0 },
+        zoom: 0,
+        addressControl:false,
+        showRoadLabels:false,
+        linksControl:true,
+        panControl:true,
+        zoomControl:true,
+        fullscreenControl:false,
+        motionTracking:false,
+        motionTrackingControl:false,
+        clickToGo:true,
+        enableCloseButton:false
+      });
+    } else {
+      state.panorama.setPosition({ lat:r.lat, lng:r.lng });
+      state.panorama.setPov({ heading: Math.random()*360, pitch:0 });
+    }
+    setTimeout(function(){ google.maps.event.trigger(state.panorama, 'resize'); }, 150);
+  }
+
+  function ensureGuessMap(){
+    if(state.guessMap) return;
+    state.guessMap = new google.maps.Map(document.getElementById('mapViewport'), {
+      center: CENTER, zoom: 13,
+      streetViewControl:false, fullscreenControl:false, mapTypeControl:true, clickableIcons:false
+    });
+    state.guessMap.addListener('click', function(e){ placeGuessMarker(e.latLng); });
+  }
+  function placeGuessMarker(latLng){
+    if(state.guessMarker){ state.guessMarker.setPosition(latLng); }
+    else {
+      state.guessMarker = new google.maps.Marker({ position:latLng, map:state.guessMap, draggable:true });
+      state.guessMarker.addListener('dragend', function(){
+        state.guess = { lat:state.guessMarker.getPosition().lat(), lng:state.guessMarker.getPosition().lng() };
+        document.getElementById('btnConfirm').disabled = false;
+      });
+    }
+    state.guess = { lat:latLng.lat(), lng:latLng.lng() };
+    document.getElementById('btnConfirm').disabled = false;
+  }
+  function expandMapPanel(){
+    document.getElementById('mapPanel').classList.add('expanded');
+    document.getElementById('scrim').classList.add('show');
+    state.mapExpanded = true;
+    ensureGuessMap();
+    setTimeout(function(){
+      google.maps.event.trigger(state.guessMap, 'resize');
+      if(!state.guess) state.guessMap.setCenter(CENTER);
+    }, 60);
+  }
+  function collapseMapPanel(){
+    document.getElementById('mapPanel').classList.remove('expanded');
+    document.getElementById('scrim').classList.remove('show');
+    state.mapExpanded = false;
+  }
+  function ensureRevealMap(){
+    if(state.revealMap) return;
+    state.revealMap = new google.maps.Map(document.getElementById('revealMap'), {
+      center: CENTER, zoom: 13, streetViewControl:false, fullscreenControl:false, mapTypeControl:false, disableDefaultUI:true
+    });
+    state.revealTruthMarker = new google.maps.Marker({ map:state.revealMap, icon:{ path: google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#3F6B4E', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 } });
+    state.revealGuessMarker = new google.maps.Marker({ map:state.revealMap, icon:{ path: google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#C1602E', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 } });
+    state.revealPolyline = new google.maps.Polyline({ strokeColor:'#17261C', strokeOpacity:0.9, strokeWeight:4, icons:[{ icon:{path:'M 0,-1 0,1', strokeOpacity:1, scale:3}, offset:'0', repeat:'14px' }], map:state.revealMap });
+  }
+
+  function renderRound(){
+    if(!document.getElementById('playView')) buildGameShell();
+    state.guess = null;
+    if(state.guessMarker){ state.guessMarker.setMap(null); state.guessMarker = null; }
+    collapseMapPanel();
+    document.getElementById('btnConfirm').disabled = true;
+    saveSession();
+    var r = currentRound();
+    document.getElementById('playView').hidden = false;
+    document.getElementById('revealView').hidden = true;
+    document.getElementById('roundbarText').innerHTML = 'Rodada <b class="num">'+(state.current+1)+'</b> de '+ROUNDS_PER_GAME;
+    document.getElementById('topbarSlot').innerHTML = renderTopbar(true);
+    ensurePanorama(r);
   }
 
   function settleRound(){
@@ -419,35 +460,38 @@
 
   function renderReveal(dKm, score){
     var isLast = state.current === state.rounds.length - 1;
-    app.innerHTML =
-      renderTopbar(true) +
-      '<div class="reveal">' +
-        '<div class="eyebrow">Resultado da rodada '+(state.current+1)+'</div>' +
-        '<div class="reveal-map" id="revealMap"></div>' +
-        '<div class="reveal-score"><div class="pts display num">'+score+' pts</div><div class="dist">Você errou por <b>'+fmtDist(dKm)+'</b></div></div>' +
-        '<button class="btn" id="btnNext">'+(isLast ? 'Ver resultado final' : 'Próxima rodada')+'</button>' +
-      '</div>';
+    document.getElementById('playView').hidden = true;
+    document.getElementById('revealView').hidden = false;
+    document.getElementById('topbarSlot').innerHTML = renderTopbar(true);
+    document.getElementById('revealEyebrow').textContent = 'Resultado da rodada ' + (state.current+1);
+    document.getElementById('revealPts').textContent = score + ' pts';
+    document.getElementById('revealDist').innerHTML = 'Você errou por <b>'+fmtDist(dKm)+'</b>';
+    document.getElementById('btnNext').textContent = isLast ? 'Ver resultado final' : 'Próxima rodada';
 
     var res = state.results[state.results.length-1];
-    var map = new google.maps.Map(document.getElementById('revealMap'), {
-      center: res.truth, zoom: 13, streetViewControl:false, fullscreenControl:false, mapTypeControl:false, disableDefaultUI:true
-    });
-    var truthMarker = new google.maps.Marker({ position:res.truth, map:map, icon:{ path: google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#3F6B4E', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 } });
-    var guessMarker = new google.maps.Marker({ position:res.guess, map:map, icon:{ path: google.maps.SymbolPath.CIRCLE, scale:9, fillColor:'#C1602E', fillOpacity:1, strokeColor:'#fff', strokeWeight:3 } });
-    new google.maps.Polyline({ path:[res.guess, res.truth], strokeColor:'#17261C', strokeOpacity:0.9, strokeWeight:4, icons:[{ icon:{path:'M 0,-1 0,1', strokeOpacity:1, scale:3}, offset:'0', repeat:'14px' }], map:map });
+    ensureRevealMap();
+    state.revealTruthMarker.setPosition(res.truth);
+    state.revealGuessMarker.setPosition(res.guess);
+    state.revealPolyline.setPath([res.guess, res.truth]);
     var bounds = new google.maps.LatLngBounds();
     bounds.extend(res.truth); bounds.extend(res.guess);
-    map.fitBounds(bounds, 60);
+    setTimeout(function(){
+      google.maps.event.trigger(state.revealMap, 'resize');
+      state.revealMap.fitBounds(bounds, 60);
+    }, 60);
+  }
 
-    document.getElementById('btnNext').addEventListener('click', function(){
-      if(isLast){ renderFinal(); } else { state.current++; renderRound(); }
-    });
+  function teardownGameShell(){
+    if(state.guessMarker){ state.guessMarker.setMap(null); }
+    state.panorama = null; state.guessMap = null; state.guessMarker = null;
+    state.revealMap = null; state.revealTruthMarker = null; state.revealGuessMarker = null; state.revealPolyline = null;
   }
 
   function renderFinal(){
     var total = state.results.reduce(function(s,r){return s+r.score;},0);
     saveLastResult(total);
     clearSession();
+    teardownGameShell();
 
     var rowsHtml = state.results.map(function(res,i){
       return '<div class="breakdown-row"><div class="info"><div class="n">Rodada '+(i+1)+'</div><div class="d">'+fmtDist(res.distKm)+'</div></div><div class="pts num">'+res.score+'</div></div>';
