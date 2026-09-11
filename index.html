@@ -168,7 +168,6 @@
 (function(){
   "use strict";
 
-  /* ---------- área de sorteio (bounding box de Palmeira, PR) ---------- */
   var BOUNDS = { latMin:-25.460, latMax:-25.385, lonMin:-50.035, lonMax:-49.955 };
   var CENTER = { lat:-25.4212, lng:-49.9981 };
   var ROUNDS_PER_GAME = 5;
@@ -194,7 +193,6 @@
     return km.toFixed(2).replace('.', ',') + ' km';
   }
 
-  /* ---------- persistência: retomar jogo em andamento após F5 / fechar aba ---------- */
   function saveSession(){
     try{
       localStorage.setItem(SESSION_KEY, JSON.stringify({ rounds: state.rounds, current: state.current, results: state.results }));
@@ -281,7 +279,6 @@
     });
   }
 
-  /* ---------- sorteio de rodadas (aleatoriedade real, a cada partida) ---------- */
   function randomPoint(){
     return { lat: BOUNDS.latMin + Math.random()*(BOUNDS.latMax-BOUNDS.latMin), lng: BOUNDS.lonMin + Math.random()*(BOUNDS.lonMax-BOUNDS.lonMin) };
   }
