@@ -279,9 +279,9 @@
     }).catch(function(){});
   }
 
-  function renderTopbar(showStatus){
+  function renderTopbar(showStatus, brandText){
     var totalScore = state.results.reduce(function(s,r){return s+r.score;},0);
-    return '<div class="topbar"><div class="brand">Perdido em Palmeira</div>' +
+    return '<div class="topbar"><div class="brand">' + (brandText || 'Perdido em Palmeira') + '</div>' +
       (showStatus ? ('<div class="status-pill"><span class="tag">Rodada <b class="num">'+(state.current+1)+'</b>/'+ROUNDS_PER_GAME+'</span><span class="score num">'+totalScore+' pts</span></div>') : '') +
       '</div>';
   }
@@ -294,7 +294,7 @@
     var prev = loadLastResult();
     var needsLogin = !firebaseMissing() && !state.user;
     app.innerHTML =
-      renderTopbar(false) +
+      renderTopbar(false, 'Você conhece a sua cidade?') +
       '<div class="landing">' +
         '<div class="hero">' +
           '<div class="hero-content">' +
