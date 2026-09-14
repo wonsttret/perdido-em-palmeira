@@ -79,6 +79,8 @@
   .hero p.lede{ font-size:1.05rem; max-width:46ch; color:#E4E9E0; margin:0 0 1.4rem; }
   .hero-meta{ display:flex; flex-wrap:wrap; gap:0.5rem 1.2rem; font-size:0.85rem; color:#CBD6C9; margin-bottom:1.4rem; }
   .hero-meta b{ color:#FBFAF4; }
+  .user-row{ font-size:0.9rem; color:#E4E9E0; margin-bottom:0.9rem; }
+  .linklike{ background:none; border:none; padding:0; color:#CFE3D4; text-decoration:underline; cursor:pointer; font-size:inherit; font-family:inherit; }
 
   .btn{
     appearance:none; border:none; cursor:pointer; font-family:'Big Shoulders Display',sans-serif; font-weight:700;
@@ -165,6 +167,9 @@
 <div id="app"></div>
 
 <script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -227,7 +232,39 @@
 
   var app = document.getElementById('app');
   var state = { rounds:[], current:0, guess:null, results:[], panorama:null, guessMap:null, guessMarker:null, mapExpanded:false,
-    revealMap:null, revealTruthMarker:null, revealGuessMarker:null, revealPolyline:null };
+    revealMap:null, revealTruthMarker:null, revealGuessMarker:null, revealPolyline:null, user:null };
+
+  function firebaseMissing(){
+    return !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKey || window.FIREBASE_CONFIG.apiKey.indexOf('COLE_') === 0;
+  }
+  var fbAuth = null, fbDb = null;
+  if(!firebaseMissing() && window.firebase){
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbAuth.onAuthStateChanged(function(user){
+      state.user = user;
+      if(document.getElementById('btnPlay') || document.getElementById('btnLogin')) renderLanding();
+    });
+  }
+  function signIn(){
+    if(!fbAuth) return;
+    fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(){});
+  }
+  function signOutUser(){
+    if(fbAuth) fbAuth.signOut();
+  }
+  function recordPlay(total){
+    if(!fbDb || !state.user) return;
+    fbDb.collection('plays').add({
+      uid: state.user.uid,
+      name: state.user.displayName || '',
+      email: state.user.email || '',
+      total: total,
+      rounds: state.results.length,
+      ts: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(){});
+  }
 
   function heroTexture(){
     return '<svg class="hero-tex" width="100%" height="100%" preserveAspectRatio="none">' +
@@ -249,6 +286,7 @@
 
   function renderLanding(){
     var prev = loadLastResult();
+    var needsLogin = !firebaseMissing() && !state.user;
     app.innerHTML =
       renderTopbar(false) +
       '<div class="landing">' +
@@ -258,7 +296,8 @@
             '<h1>Perdido em<br>Palmeira</h1>' +
             '<p class="lede">Um GeoGuessr só da sua cidade: o jogo te larga em um ponto aleatório de verdade em Palmeira, PR, com Street View de verdade &mdash; anda, gira, dá zoom. Você sabe onde está?</p>' +
             '<div class="hero-meta"><span><b>5</b> rodadas</span><span><b>865m</b> de altitude</span><span><b>25.000</b> pts no total</span></div>' +
-            '<button class="btn" id="btnPlay">Jogar</button>' +
+            (state.user ? ('<div class="user-row">Oi, ' + (state.user.displayName||'').split(' ')[0] + ' <button class="linklike" id="btnLogout">sair</button></div>') : '') +
+            '<button class="btn" id="' + (needsLogin ? 'btnLogin' : 'btnPlay') + '">' + (needsLogin ? 'Entrar com Google' : 'Jogar') + '</button>' +
           '</div>' +
         '</div>' +
         '<div class="landing-body">' +
@@ -273,12 +312,19 @@
         '</div>' +
       '</div>' +
       '<footer class="credit-line">Street View e mapas &copy; Google</footer>';
-    document.getElementById('btnPlay').addEventListener('click', function(){
-      if(keyMissing()) return;
-      clearSession();
-      state.current = 0; state.results = []; state.guess = null;
-      startGame();
-    });
+    if(needsLogin){
+      document.getElementById('btnLogin').addEventListener('click', signIn);
+    } else {
+      document.getElementById('btnPlay').addEventListener('click', function(){
+        if(keyMissing()) return;
+        clearSession();
+        state.current = 0; state.results = []; state.guess = null;
+        startGame();
+      });
+    }
+    if(document.getElementById('btnLogout')){
+      document.getElementById('btnLogout').addEventListener('click', signOutUser);
+    }
   }
 
   function randomPoint(){
@@ -488,6 +534,7 @@
   function renderFinal(){
     var total = state.results.reduce(function(s,r){return s+r.score;},0);
     saveLastResult(total);
+    recordPlay(total);
     clearSession();
     teardownGameShell();
 
