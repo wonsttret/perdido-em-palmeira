@@ -62,6 +62,12 @@
   .status-pill{ display:flex; align-items:center; gap:0.9rem; font-family:'Big Shoulders Display',sans-serif; font-weight:700; letter-spacing:0.03em; }
   .status-pill .tag{ background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:0.25rem 0.75rem; font-size:0.95rem; color:var(--text-muted); }
   .status-pill .score{ color:var(--terracotta); font-size:1.2rem; }
+  .topbar-right{ display:flex; align-items:center; gap:0.8rem; }
+  .exit-btn{
+    width:26px; height:26px; border-radius:50%; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text-muted); font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .exit-btn:hover{ border-color:var(--terracotta); color:var(--terracotta); }
 
   .landing{ flex:1; display:flex; flex-direction:column; align-items:center; }
   .hero{
@@ -282,8 +288,24 @@
   function renderTopbar(showStatus, brandText){
     var totalScore = state.results.reduce(function(s,r){return s+r.score;},0);
     return '<div class="topbar"><div class="brand">' + (brandText || 'Perdido em Palmeira') + '</div>' +
-      (showStatus ? ('<div class="status-pill"><span class="tag">Rodada <b class="num">'+(state.current+1)+'</b>/'+ROUNDS_PER_GAME+'</span><span class="score num">'+totalScore+' pts</span></div>') : '') +
+      (showStatus ? (
+        '<div class="topbar-right">' +
+          '<div class="status-pill"><span class="tag">Rodada <b class="num">'+(state.current+1)+'</b>/'+ROUNDS_PER_GAME+'</span><span class="score num">'+totalScore+' pts</span></div>' +
+          '<button class="exit-btn" id="btnExit" title="Sair do jogo" aria-label="Sair do jogo">&times;</button>' +
+        '</div>'
+      ) : '') +
       '</div>';
+  }
+  function wireExitButton(){
+    var btn = document.getElementById('btnExit');
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      if(confirm('Sair do jogo? O progresso desta partida será perdido.')){
+        clearSession();
+        teardownGameShell();
+        renderLanding();
+      }
+    });
   }
 
   function keyMissing(){
@@ -507,6 +529,7 @@
     document.getElementById('revealView').hidden = true;
     document.getElementById('roundbarText').innerHTML = 'Rodada <b class="num">'+(state.current+1)+'</b> de '+ROUNDS_PER_GAME;
     document.getElementById('topbarSlot').innerHTML = renderTopbar(true);
+    wireExitButton();
     ensurePanorama(r);
   }
 
@@ -524,6 +547,7 @@
     document.getElementById('playView').hidden = true;
     document.getElementById('revealView').hidden = false;
     document.getElementById('topbarSlot').innerHTML = renderTopbar(true);
+    wireExitButton();
     document.getElementById('revealEyebrow').textContent = 'Resultado da rodada ' + (state.current+1);
     document.getElementById('revealPts').textContent = score + ' pts';
     document.getElementById('revealDist').innerHTML = 'Você errou por <b>'+fmtDist(dKm)+'</b>';
